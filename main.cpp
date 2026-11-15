@@ -1,25 +1,64 @@
 #include "color.h"
+#include "ray.h"
 #include "vec3.h"
 #include <iostream>
 
-int main() {
-    // Image dimensions
-    const int image_width = 256;
-    const int image_height = 256;
+// Calculates the color of the background (sky) based on the ray's direction.
+color ray_color(const ray& r) {
+    vec3 unit_direction = unit_vector(r.direction());
+    // Scale the y-component from [-1.0, 1.0] to [0.0, 1.0]
+    auto a = 0.5 * (unit_direction.y() + 1.0);
+    // Linearly blend between white (a=0.0) and light blue (a=1.0)
+    return (1.0 - a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7, 1.0);
+}
 
+int main() {
+    // 1. Image Settings
+    auto aspect_ratio = 16.0 / 9.0;
+    int image_width = 400;
+    
+    // Calculate image height based on aspect ratio, ensuring it's at least 1.
+    int image_height = static_cast<int>(image_width / aspect_ratio);
+    image_height = (image_height < 1) ? 1 : image_height;
+
+    // 2. Camera & Viewport Settings
+    auto focal_length = 1.0; // Distance from camera to viewport
+    auto viewport_height = 2.0;
+    auto viewport_width = viewport_height * (static_cast<double>(image_width) / image_height);
+    auto camera_center = point3(0, 0, 0);
+
+    // "I see this ray is pointing upwards (high Y value). I'll paint this pixel light blue."
+    // OR
+    // "I see this ray is pointing downwards (low Y value). I'll paint this pixel white."
+
+    // Calculate vectors that span the viewport's horizontal and vertical edges.
+    auto viewport_u = vec3(viewport_width, 0, 0);
+    auto viewport_v = vec3(0, -viewport_height, 0); // Y points down for the image grid
+
+    // Calculate the distance (delta) between individual pixels.
+    auto pixel_delta_u = viewport_u / image_width;
+    auto pixel_delta_v = viewport_v / image_height;
+
+    // Locate the top-left pixel in 3D space.
+    auto viewport_upper_left = camera_center - vec3(0, 0, focal_length) - viewport_u/2 - viewport_v/2;
+    auto pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
+
+    // 3. Render Loop
     std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
     for (int j = 0; j < image_height; ++j) {
         std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
         for (int i = 0; i < image_width; ++i) {
             
-            // Now leveraging our vec3 class under the color alias
-            color pixel_color(
-                double(i) / (image_width - 1),
-                double(j) / (image_height - 1),
-                0.0
-            );
+            // Find the exact 3D center of the current pixel
+            auto pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
             
+            // Create a ray from the camera passing through the pixel
+            auto ray_direction = pixel_center - camera_center;
+            ray r(camera_center, ray_direction);
+
+            // Determine the color of the ray
+            color pixel_color = ray_color(r);
             write_color(std::cout, pixel_color);
         }
     }
