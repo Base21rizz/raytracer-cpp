@@ -1,29 +1,13 @@
-#include "color.h"
-#include "ray.h"
-#include "vec3.h"
-#include <iostream>
+#include "rtweekend.h"
 
-double hit_sphere(const point3& center, double radius, const ray& r) {
-    vec3 oc = r.origin() - center;
-    auto a = r.direction().length_squared();
-    auto half_b = dot(oc, r.direction());
-    auto c = oc.length_squared() - radius * radius;
-    auto discriminant = half_b * half_b - a * c;
+#include "hittable.h"
+#include "hittable_list.h"
+#include "sphere.h"
 
-    if (discriminant < 0) {
-        return -1.0;
-    } else {
-        // Return the closest intersection point along the ray
-        return (-half_b - std::sqrt(discriminant)) / a;
-    }
-}
-
-// Calculates the color of the background (sky) based on the ray's direction.
-color ray_color(const ray& r) {
-    auto t = hit_sphere(point3(0, 0, -1), 0.5, r);
-    if (t > 0.0) {
-        vec3 N = unit_vector(r.at(t) - vec3(0, 0, -1));
-        return 0.5 * color(N.x() + 1, N.y() + 1, N.z() + 1);
+color ray_color(const ray& r, const hittable& world) {
+    hit_record rec;
+    if (world.hit(r, 0, infinity, rec)) {
+        return 0.5 * (rec.normal + color(1, 1, 1));
     }
 
     vec3 unit_direction = unit_vector(r.direction());
@@ -32,54 +16,46 @@ color ray_color(const ray& r) {
 }
 
 int main() {
-    // 1. Image Settings
+    // Image
     auto aspect_ratio = 16.0 / 9.0;
     int image_width = 400;
-    
-    // Calculate image height based on aspect ratio, ensuring it's at least 1.
     int image_height = static_cast<int>(image_width / aspect_ratio);
     image_height = (image_height < 1) ? 1 : image_height;
 
-    // 2. Camera & Viewport Settings
-    auto focal_length = 1.0; // Distance from camera to viewport
+    // World
+    hittable_list world;
+    world.add(std::make_shared<sphere>(point3(0, 0, -1), 0.5));
+    world.add(std::make_shared<sphere>(point3(0, -100.5, -1), 100));
+
+    // Camera
+    auto focal_length = 1.0;
     auto viewport_height = 2.0;
     auto viewport_width = viewport_height * (static_cast<double>(image_width) / image_height);
     auto camera_center = point3(0, 0, 0);
 
-    // "I see this ray is pointing upwards (high Y value). I'll paint this pixel light blue."
-    // OR
-    // "I see this ray is pointing downwards (low Y value). I'll paint this pixel white."
-
-    // Calculate vectors that span the viewport's horizontal and vertical edges.
     auto viewport_u = vec3(viewport_width, 0, 0);
-    auto viewport_v = vec3(0, -viewport_height, 0); // Y points down for the image grid
+    auto viewport_v = vec3(0, -viewport_height, 0);
 
-    // Calculate the distance (delta) between individual pixels.
     auto pixel_delta_u = viewport_u / image_width;
     auto pixel_delta_v = viewport_v / image_height;
 
-    // Locate the top-left pixel in 3D space.
     auto viewport_upper_left = camera_center - vec3(0, 0, focal_length) - viewport_u/2 - viewport_v/2;
     auto pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
-    // 3. Render Loop
+    // Render
     std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
     for (int j = 0; j < image_height; ++j) {
         std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
         for (int i = 0; i < image_width; ++i) {
-            
-            // Find the exact 3D center of the current pixel
             auto pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
-            
-            // Create a ray from the camera passing through the pixel
             auto ray_direction = pixel_center - camera_center;
             ray r(camera_center, ray_direction);
 
-            // Determine the color of the ray
-            color pixel_color = ray_color(r);
+            color pixel_color = ray_color(r, world);
             write_color(std::cout, pixel_color);
         }
     }
+
     std::clog << "\rDone.                 \n";
 }
