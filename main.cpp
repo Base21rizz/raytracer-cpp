@@ -48,8 +48,8 @@ int main() {
 
     camera cam;
     cam.aspect_ratio      = 16.0 / 9.0;
-    cam.image_width       = 400;  // Bump to 1200 after Step 12 multithreading
-    cam.samples_per_pixel = 20;   // Bump to 500 after Step 12 multithreading
+    cam.image_width       = 1200;
+    cam.samples_per_pixel = 100; // Set to 500 for an ultra-clean final render
     cam.max_depth         = 50;
 
     cam.vfov     = 20;
