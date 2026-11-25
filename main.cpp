@@ -3,12 +3,22 @@
 #include "vec3.h"
 #include <iostream>
 
+bool hit_sphere(const point3& center, double radius, const ray& r) {
+    vec3 oc = r.origin() - center;
+    auto a = r.direction().length_squared();
+    auto half_b = dot(oc, r.direction());
+    auto c = oc.length_squared() - radius * radius;
+    auto discriminant = half_b * half_b - a * c;
+    return (discriminant >= 0);
+}
+
 // Calculates the color of the background (sky) based on the ray's direction.
 color ray_color(const ray& r) {
+    if (hit_sphere(point3(0, 0, -1), 0.5, r))
+        return color(1, 0, 0);
+
     vec3 unit_direction = unit_vector(r.direction());
-    // Scale the y-component from [-1.0, 1.0] to [0.0, 1.0]
     auto a = 0.5 * (unit_direction.y() + 1.0);
-    // Linearly blend between white (a=0.0) and light blue (a=1.0)
     return (1.0 - a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7, 1.0);
 }
 
